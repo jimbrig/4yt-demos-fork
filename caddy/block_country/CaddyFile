@@ -1,0 +1,39 @@
+{
+  auto_https off
+  order geoip2_vars first
+  geoip2 {
+    databaseDirectory "/tmp/"
+    lockFile          "/tmp/geoip2.lock"
+    editionID         "GeoLite2-City"
+  }
+}
+
+:80, :443 {
+    geoip2_vars wild
+
+    header geoip-country "{geoip2.country_code}"
+
+    @geofilter expression ({geoip2.country_code} == "US" || {geoip2.country_code} == "CA")
+
+    log {
+        output stdout
+        level INFO
+    }
+
+    # Handle requests to /api/*
+    handle /api/* {
+
+        handle @geofilter {
+          reverse_proxy @geofilter backend:80
+        }
+
+        respond "country blocked" 403
+    }
+
+    # Default response for all other requests
+    handle {
+        respond "Welcome to yourdomain.com" 200
+    }
+
+}
+
